@@ -1,68 +1,91 @@
+import sys
 import time
 import threading
-import sys
 import pyperclip
 import pyautogui
 import ollama
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
+from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal, QObject
+from PyQt6.QtGui import QFont, QCursor
 from pynput import keyboard
 
+# --- Configuration ---
 MODEL = "a9i-model:latest"
 HOTKEY_STR = '<ctrl>+<alt>+s'
 
-class Loader:
+# --- Signal Bridge ---
+class Communicate(QObject):
+    # This signal carries the result text and the mouse position
+    display_signal = pyqtSignal(str, QPoint)
+
+# --- The "Ghost" UI ---
+class A9IFrame(QWidget):
     def __init__(self):
-        self.stop_event = threading.Event()
-        # daemon=True ensures the spinner stops if the main script exits
-        self.thread = threading.Thread(target=self._animate, daemon=True)
+        super().__init__()
+        # 1. Stripped Frame: No title bar, no taskbar icon, stays on top
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint | 
+            Qt.WindowType.WindowStaysOnTopHint | 
+            Qt.WindowType.Tool
+        )
+        # 2. Translucent for rounded corners effect
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        layout = QVBoxLayout()
+        self.label = QLabel("A9I is thinking...")
+        self.label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(20, 20, 20, 240);
+                color: #00FF99;
+                border: 1px solid #333;
+                border-radius: 15px;
+                padding: 20px;
+            }
+        """)
+        # Using a clean font
+        self.label.setFont(QFont("Inter", 11, QFont.Weight.Medium))
+        self.label.setWordWrap(True)
+        self.label.setFixedWidth(350) # Manageable width for definitions
+        
+        layout.addWidget(self.label)
+        self.setLayout(layout)
+        
+        # 3. Auto-hide timer
+        self.hide_timer = QTimer()
+        self.hide_timer.timeout.connect(self.hide)
 
-    def _animate(self):
-        chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-        i = 0
-        while not self.stop_event.is_set():
-            # \r moves the cursor back to the start of the line
-            sys.stdout.write(f'\r[A9I] {chars[i % len(chars)]} Thinking...')
-            sys.stdout.flush()
-            time.sleep(0.1)
-            i += 1
+    def show_translation(self, text, pos):
+        self.label.setText(text)
+        self.adjustSize()
+        
+        # Move the frame near the cursor (offset slightly so it's not under the mouse)
+        self.move(pos.x() + 25, pos.y() + 25)
+        self.show()
+        
+        # Start 7-second countdown to disappear
+        self.hide_timer.start(7000)
 
-    def start(self): 
-        self.thread.start()
-
-    def stop(self):
-        self.stop_event.set()
-        self.thread.join()
-        # Clean the line after stopping
-        sys.stdout.write('\r' + ' ' * 30 + '\r')
-        sys.stdout.flush()
-
-# --- The Reliable Grabber ---
+# --- The Logic Engine ---
 def get_selected_text():
     old_clipboard = pyperclip.paste()
-    pyperclip.copy('') # Clear to detect a fresh copy
+    pyperclip.copy('')
     
-    # 1. WAIT for the user to release the physical hotkeys.
-    # If Alt is still physically held, Ctrl+C becomes Ctrl+Alt+C.
-    time.sleep(0.3) 
+    time.sleep(0.3) # Wait for finger release
     
-    # 2. Fire Ctrl+C. 
-    # keyDown/keyUp is more forceful than 'hotkey()' for the OS buffer.
     pyautogui.keyDown('ctrl')
     pyautogui.press('c')
     pyautogui.keyUp('ctrl')
     
-    # 3. Retry Loop: Wait up to 0.7s for the clipboard to actually update.
-    # OS clipboard operations are asynchronous and can be slow.
     for _ in range(7):
         time.sleep(0.1)
         text = pyperclip.paste().strip()
         if text:
             return text, old_clipboard
-            
     return "", old_clipboard
 
-# --- The Engine ---
-def a9i_engine():
-    # Use a global flag to prevent multiple triggers if you spam the key
+is_running = False
+
+def a9i_worker(comm):
     global is_running
     if is_running: 
         return
@@ -71,39 +94,44 @@ def a9i_engine():
     try:
         text, old_clipboard = get_selected_text()
         if not text:
-            # Silent fail for invisible feel, or debug print:
-            # print("[A9I] No text captured.")
+            is_running = False
             return
 
-        loader = Loader()
-        loader.start()
-
-        # Call your custom A9I Modelfile
+        # Capture mouse position right now
+        mouse_pos = QCursor.pos()
+        
+        # Call Ollama
         response = ollama.generate(model=MODEL, prompt=text)
         result = response['response'].strip()
         
-        loader.stop()
-        print(f"✨ A9I: {result}")
+        # Emit signal to the UI thread
+        comm.display_signal.emit(result, mouse_pos)
 
     except Exception as e:
-        if 'loader' in locals(): 
-            loader.stop()
-        print(f"\n[A9I] Error: {e}")
+        print(f"Error: {e}")
     finally:
-        # Restore the original clipboard so your workflow isn't disrupted
         pyperclip.copy(old_clipboard)
         is_running = False
 
-is_running = False
+# --- Main Entry ---
+def main():
+    # Initialize the App
+    app = QApplication(sys.argv)
+    
+    # Setup UI and Signal Bridge
+    ghost_frame = A9IFrame()
+    comm = Communicate()
+    comm.display_signal.connect(ghost_frame.show_translation)
 
-def on_hotkey():
-    # Always run the logic in a separate thread to keep the listener responsive
-    threading.Thread(target=a9i_engine, daemon=True).start()
+    # Keyboard Listener setup
+    def trigger_worker():
+        threading.Thread(target=a9i_worker, args=(comm,), daemon=True).start()
 
-def run_a9i():
-    print(f"🚀 A9I Core Active | Hotkey: {HOTKEY_STR}")
-    with keyboard.GlobalHotKeys({HOTKEY_STR: on_hotkey}) as h:
-        h.join()
+    listener = keyboard.GlobalHotKeys({HOTKEY_STR: trigger_worker})
+    listener.start()
+
+    print(f"🚀 A9I Ghost Frame Active | {HOTKEY_STR}")
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
-    run_a9i()
+    main()
