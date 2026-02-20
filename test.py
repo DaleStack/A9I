@@ -4,11 +4,11 @@ import threading
 _lock = threading.Lock()
 
 def on_activate():
+    """Testing hotkey activation."""
     if not _lock.acquire(blocking=False):
         return  # already running, ignore repeat
     try:
         print("Hotkey fired!")
-        # your a9i_engine() goes here
     finally:
         _lock.release()
 
