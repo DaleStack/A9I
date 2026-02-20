@@ -198,6 +198,7 @@ def a9i_worker(comm):
         text, old_clipboard = get_selected_text()
         if not text:
             comm.dismiss_signal.emit()
+            is_running = False
             return
 
         # Call Ollama
@@ -211,7 +212,8 @@ def a9i_worker(comm):
         print(f"Error: {e}")
         comm.dismiss_signal.emit()
     finally:
-        pyperclip.copy(old_clipboard)
+        if old_clipboard:
+            pyperclip.copy(old_clipboard)
         is_running = False
 
 
