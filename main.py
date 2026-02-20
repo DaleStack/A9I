@@ -5,7 +5,7 @@ import pyperclip
 import pyautogui
 import ollama
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal, QObject
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTimer, QPoint, pyqtSignal, QObject
 from PyQt6.QtGui import QFont, QCursor
 from pynput import keyboard
 
@@ -22,17 +22,16 @@ class Communicate(QObject):
 class A9IFrame(QWidget):
     def __init__(self):
         super().__init__()
-        # 1. Stripped Frame: No title bar, no taskbar icon, stays on top
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint | 
             Qt.WindowType.WindowStaysOnTopHint | 
             Qt.WindowType.Tool
         )
-        # 2. Translucent for rounded corners effect
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        
+        self.setWindowOpacity(0.0)
+
         layout = QVBoxLayout()
-        self.label = QLabel("A9I is thinking...")
+        self.label = QLabel("A9I Thinking...")
         self.label.setStyleSheet("""
             QLabel {
                 background-color: rgba(20, 20, 20, 240);
@@ -42,28 +41,57 @@ class A9IFrame(QWidget):
                 padding: 20px;
             }
         """)
-        # Using a clean font
         self.label.setFont(QFont("Inter", 11, QFont.Weight.Medium))
         self.label.setWordWrap(True)
-        self.label.setFixedWidth(350) # Manageable width for definitions
-        
+        self.label.setFixedWidth(350)
         layout.addWidget(self.label)
         self.setLayout(layout)
-        
-        # 3. Auto-hide timer
+
+        self.fade_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.fade_animation.setDuration(250)
+        self.fade_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        # Connect hide ONCE here, not repeatedly in start_fade_out
+        self.fade_animation.finished.connect(self._on_animation_finished)
+
         self.hide_timer = QTimer()
-        self.hide_timer.timeout.connect(self.hide)
+        self.hide_timer.setSingleShot(True)
+        self.hide_timer.timeout.connect(self.start_fade_out)
+        
+        self._fading_out = False
+
+    def _on_animation_finished(self):
+        if self._fading_out:
+            self._fading_out = False
+            self.hide()
+            self.setWindowOpacity(0.0)
 
     def show_translation(self, text, pos):
+        # Stop whatever animation is running
+        self.fade_animation.stop()
+        self.hide_timer.stop()
+        self._fading_out = False
+
         self.label.setText(text)
         self.adjustSize()
-        
-        # Move the frame near the cursor (offset slightly so it's not under the mouse)
         self.move(pos.x() + 25, pos.y() + 25)
+
         self.show()
-        
-        # Start 7-second countdown to disappear
+        self.fade_animation.setStartValue(self.windowOpacity())  # animate from current opacity
+        self.fade_animation.setEndValue(1.0)
+        self.fade_animation.start()
+
         self.hide_timer.start(7000)
+
+    def start_fade_out(self):
+        self.fade_animation.stop()
+        self._fading_out = True
+        self.fade_animation.setStartValue(self.windowOpacity())  # animate from current opacity
+        self.fade_animation.setEndValue(0.0)
+        self.fade_animation.start()
+
+    def mousePressEvent(self, event):
+        self.hide_timer.stop()
+        self.start_fade_out()
 
 # --- The Logic Engine ---
 def get_selected_text():
