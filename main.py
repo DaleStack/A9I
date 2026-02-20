@@ -198,7 +198,6 @@ def a9i_worker(comm):
         text, old_clipboard = get_selected_text()
         if not text:
             comm.dismiss_signal.emit()
-            is_running = False
             return
 
         # Call Ollama
