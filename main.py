@@ -92,7 +92,7 @@ class A9IFrame(QWidget):
                 padding: 20px;
             }
         """)
-        self.label.setText("A9I Thinking…")
+        self.label.setText("A9I Thinking...")
         self.adjustSize()
         self.move(pos.x() + 25, pos.y() + 25)
 
