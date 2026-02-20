@@ -212,8 +212,7 @@ def a9i_worker(comm):
         print(f"Error: {e}")
         comm.dismiss_signal.emit()
     finally:
-        if old_clipboard:
-            pyperclip.copy(old_clipboard)
+        pyperclip.copy(old_clipboard)
         is_running = False
 
 
