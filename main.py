@@ -5,7 +5,7 @@ from pynput import keyboard
 
 from config import TRANSLATE_HOTKEY, DEFINE_HOTKEY
 from ui import A9IFrame, Communicate
-from engine import a9i_text_grabber, a9i_ai_executor
+from engine import a9i_text_grabber, a9i_ai_executor, reset_lock
 
 
 def main():
@@ -31,7 +31,9 @@ def main():
     comm.loading_signal.connect(ghost_frame.show_loading)
     comm.display_signal.connect(ghost_frame.show_translation)
 
-    # --- Hotkey Triggers ---
+    comm.cancel_signal.connect(reset_lock)
+
+    # Hotkey Triggers
     def trigger_translate():
         threading.Thread(
             target=a9i_text_grabber, args=(comm, "translate"), daemon=True

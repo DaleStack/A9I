@@ -62,3 +62,8 @@ def a9i_ai_executor(comm, mode, target_language, text, mouse_pos):
         comm.dismiss_signal.emit()
     finally:
         is_running = False
+
+def reset_lock():
+    """Unlocks the engine if the user clicks away or cancels."""
+    global is_running
+    is_running = False
