@@ -3,6 +3,7 @@ import threading
 
 _lock = threading.Lock()
 
+
 def on_activate():
     """Testing hotkey activation."""
     if not _lock.acquire(blocking=False):
@@ -12,5 +13,6 @@ def on_activate():
     finally:
         _lock.release()
 
-with keyboard.GlobalHotKeys({'<ctrl>+<alt>+s': on_activate}) as h:
+
+with keyboard.GlobalHotKeys({"<ctrl>+<alt>+s": on_activate}) as h:
     h.join()

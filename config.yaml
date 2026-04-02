@@ -1,0 +1,9 @@
+# config.yaml
+translate_languages:
+  - English
+  - Japanese
+  - Tagalog
+
+define_languages:
+  - English
+  - Simple English (ELI5)
