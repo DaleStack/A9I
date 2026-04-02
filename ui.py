@@ -137,7 +137,7 @@ class A9IFrame(QWidget):
     def show_loading(self, pos, mode):
         self._is_loading = True
         self._dot_count = 0
-        self.label.setText(f"A9I {mode.capitalize()}ing...")
+        self.label.setText(f"A9I {mode.capitalize()}...")
         self.label.setStyleSheet("QLabel { background-color: rgba(20,20,20,240); color: #888; border: 1px solid #2a2a2a; border-radius: 12px; padding: 15px; }")
         self.label.show()
         self.adjustSize()
@@ -147,7 +147,7 @@ class A9IFrame(QWidget):
         if not self._is_loading: 
             return
         self._dot_count = (self._dot_count + 1) % 4
-        self.label.setText(f"A9I {self._current_mode.capitalize()}ing{'.' * self._dot_count}")
+        self.label.setText(f"A9I {self._current_mode.capitalize()}{'.' * self._dot_count}")
 
     def show_translation(self, text, pos):
         self._loading_timer.stop()
